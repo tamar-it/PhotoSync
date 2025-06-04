@@ -8,7 +8,7 @@ from urllib.request import pathname2url
 from time import sleep
 import subprocess
 import sys
-single = True
+
 class PhotoSync:
 	def __init__(self):
 		# Setup credentioals directory
@@ -43,11 +43,11 @@ class PhotoSync:
 				if set((image_filename, image_description, image_file, pathname2url(image_file))) & set(self.photos[album_id]) == set():
 					#self.uploadPhoto(album_id, image_filename, image_description)
 					#subprocess.Popen(['python','UploadPhotoToAlbume.py',album_id, image_filename, image_description])
-					subprocess.run(['python3','UploadPhotoToAlbume.py',album_id, image_filename, image_description])
+					subprocess.run(['python','UploadPhotoToAlbume.py',album_id, image_filename, image_description])
 					"""imgThread = threading.Thread(target=self.uploadPhoto, args=(album_id, image_filename, image_description))
 					imgThread.start()"""
 					times += 1
-					if times > 3 or single:
+					if(times >= 3):
 						sleep(10)
 						times = 0
 		if times_in == 0:
@@ -83,21 +83,16 @@ class PhotoSync:
 								photos_in_album = self.service.mediaItems().search(body=search_album).execute()
 					for p in  self.photos[album_id]:
 						print("In Album: {}".format(p))
-				if single:
-					try:
-						self.uploadDirectory(album_id, [], file_name)
-						self.photos.pop(album_id)
-					except:
-						print("error with {}/{}".format(album_id,file_name))
-				else:
-					dirThread = threading.Thread(target=self.uploadDirectory, args=(album_id,[],file_name,0))
-					dirThread.start()
+				#self.uploadDirectory(album_id, [], file_name)
+				#self.photos.pop(album_id)
+				dirThread = threading.Thread(target=self.uploadDirectory, args=(album_id,[],file_name,0))
+				dirThread.start()
 				"""times += 1
 				if (times == 2):
 					sleep(30)
 					times = 0"""
 			elif file_name.endswith(('.jpg','.JPG','.png','.PNG', '.gif', '.GIF','.jpeg')):
-				 subprocess.Popen(['python3','UploadPhotoToAlbume.py',"-",  os.path.join(self.sync_directory,file_name), file_name])
+				 subprocess.Popen(['python','UploadPhotoToAlbume.py',"-",  os.path.join(self.sync_directory,file_name), file_name])
 				#imgThread = threading.Thread(target=self.uploadPhoto, args=('', os.path.join(self.sync_directory,file_name)))
 				#imgThread.start()
 
