@@ -2,3 +2,4 @@ virtualenv
 .idea
 *.bak
 test*
+client_secret.json
