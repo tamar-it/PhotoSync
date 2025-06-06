@@ -1,4 +1,5 @@
-from apiclient.discovery import build
+from google_photos_auth import get_google_photos_credentials
+from googleapiclient.discovery import build
 from apiclient.http import BatchHttpRequest
 import threading
 from httplib2 import Http
@@ -11,20 +12,10 @@ import sys
 
 class PhotoSync:
 	def __init__(self,extentions=('.jpg','.JPG','.png','.PNG','.gif','.GIf','.jpeg',), directory='~/Pictures'):
-		# Setup credentioals directory
-		credentials = os.path.expanduser('~/.PhotoSync/.credentials.json')
-		credentials_directory = os.path.dirname(credentials)
-		if not os.path.exists(credentials_directory):
-			os.makedirs(credentials_directory)
-		# Setup the Photo v1 API
+		# Setup credentials
 		SCOPES = ['https://www.googleapis.com/auth/photoslibrary']
-
-		store = file.Storage(credentials)
-		creds = store.get()
-		if not creds or creds.invalid:
-			flow = client.flow_from_clientsecrets('client_secret.json', SCOPES)
-			creds = tools.run_flow(flow, store)
-		self.service = build('photoslibrary', 'v1', http=creds.authorize(Http()))
+		creds = get_google_photos_credentials(scopes=SCOPES)
+		self.service = build('photoslibrary', 'v1', credentials=creds)
 		self.sync_directory = os.path.expanduser(directory)
 		self.extentions=extentions
 		self.photos = {}
