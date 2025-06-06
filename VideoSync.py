@@ -30,12 +30,13 @@ class PhotoSync:
 				self.uploadDirectory(album_id, path + [subdir,], image_file, times_in+1)
 			elif image_file.endswith(self.extentions):
 				image_description = "-".join(path + [ image_file ])
+				full_image_description = "-".join(path + [subdir, image_file ])
 				image_filename = os.path.join(localpath, image_file)
 				print("photo {} / {} ==== {}".format(image_filename, image_file ,image_description))
-				if set((image_filename, image_description, image_file, pathname2url(image_file))) & set(self.photos[album_id]) == set():
+				if set((image_filename, image_description, full_image_description, image_file, pathname2url(image_file))) & set(self.photos[album_id]) == set():
 					#self.uploadPhoto(album_id, image_filename, image_description)
 					#subprocess.Popen(['python','UploadPhotoToAlbume.py',album_id, image_filename, image_description])
-					subprocess.run(['python','UploadPhotoToAlbume.py',album_id, image_filename, image_description])
+					subprocess.run(['python','UploadPhotoToAlbume.py',album_id, image_filename, full_image_description])
 					"""imgThread = threading.Thread(target=self.uploadPhoto, args=(album_id, image_filename, image_description))
 					imgThread.start()"""
 					times += 1
@@ -123,7 +124,7 @@ class PhotoSync:
 			with open(photo_name,"rb") as photo_file:
 				media = photo_file.read()
 				token=self.service._http.request('https://photoslibrary.googleapis.com/v1/uploads', method='POST', body=media,headers=headers)
-			body = {"albumId":album_id,"newMediaItems":[{'description':description if description is not None else os.path.basename(photo_name),"simpleMediaItem": {"uploadToken": token[1].decode('utf8')}}]}
+			body = {"albumId":album_id,"newMediaItems":[{'description':description if description is not None else os.path.basename(photo_name),"simpleMediaItem": {"uploadToken": token[1].decode('utf8','surrogateescape')}}]}
 			media_result = self.service.mediaItems().batchCreate(body=body).execute()
 			print("\tFile {} status {}".format(photo_name.strip(self.sync_directory), media_result['newMediaItemResults'][0]['status']))
 		except Exception as err:
