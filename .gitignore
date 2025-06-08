@@ -4,3 +4,6 @@ virtualenv
 test*
 client_secret.json
 __pycache__
+.venv
+.vscode
+

@@ -6,6 +6,7 @@ import google.auth.transport.requests
 def get_google_photos_credentials(scopes=None, credentials_path=None, client_secret_path='client_secret.json'):
     if scopes is None:
         scopes = [
+            'https://www.googleapis.com/auth/photoslibrary',
             'https://www.googleapis.com/auth/photoslibrary.appendonly',
             'https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata',
             'https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata'

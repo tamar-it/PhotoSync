@@ -1,12 +1,4 @@
-#cachetools
-#pkg-resources
-pyasn1
-pyasn1-modules
-rsa
-six
-uritemplate
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
+google_auth_oauthlib
 google-api-python-client
-requests
+PILLOW
+piexif
