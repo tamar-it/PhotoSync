@@ -16,6 +16,7 @@ import multiprocessing
 import time
 import googleapiclient.errors
 import logging
+import requests  # Import requests for large video uploads
 
 # Setup logger
 logger = logging.getLogger("PhotoSync")
@@ -61,7 +62,7 @@ if sys.version_info.major == 3 and sys.version_info.minor >= 10:
         setattr(collections, "MutableMapping", collections.abc.MutableMapping)
 
 class PhotoSync:
-    def __init__(self, sync_directory='~/Pictures', dry_run=False):
+    def __init__(self, sync_directory='~/Pictures', dry_run=False, large_file_threshold=10 * 1024 * 1024):  # 10MB default
         # Setup credentials
         SCOPES = [
             'https://www.googleapis.com/auth/photoslibrary.appendonly',
@@ -74,6 +75,7 @@ class PhotoSync:
         self.photos = {}
         self.albums = self.listAlbums()
         self.dry_run = dry_run
+        self.large_file_threshold = large_file_threshold  # Files larger than this will be uploaded using uploadLargeVideo
 
     def uploadPhotoToLibrary(self, photo_name, description=None, photo_date=None):
         """
@@ -81,6 +83,9 @@ class PhotoSync:
             :param photo_name: The path to the photo file.
             :param description: Optional description for the photo.
         """
+        if self.dry_run:
+            logger.info(f"[Dry Run] Would upload {photo_name} to library with description '{description}'")
+            return "dry_run_token"
         headers = {'Authorization': "Bearer " + self.creds.token,
                    'Content-Type': 'application/octet-stream',
                    'X-Goog-Upload-File-Name': '"' + pathname2url(os.path.basename(photo_name)) + '"',
@@ -137,10 +142,19 @@ class PhotoSync:
         photo_date = get_exif_creation_date(photo_name)
         if photo_date is None:
             photo_date = datetime.datetime.fromtimestamp(os.path.getmtime(photo_name))
-            photo_token = self.uploadPhotoToLibrary(photo_name, description, photo_date)
+        
+        file_size = os.path.getsize(photo_name)
+        if file_size > self.large_file_threshold:
+            logger.info(f"File {photo_name} is larger than {self.large_file_threshold} bytes, using uploadLargeVideo")
+            photo_token = self.uploadLargeVideo(album_id, photo_name, description, photo_date)
         else:
-            photo_token = self.uploadPhotoToLibrary(photo_name, description)
-            
+            logger.info(f"File {photo_name} is smaller than {self.large_file_threshold} bytes, using uploadPhotoToLibrary")
+            # Upload photo to library and get the token
+            photo_token = self.uploadPhotoToLibrary(photo_name, description, photo_date)
+        if photo_token is None:
+            logger.error(f"Failed to upload photo {photo_name}, skipping adding to album.")
+            return
+
         photo_year = photo_date.strftime('%Y')
         
         logger.info(f"Preparing to upload photo {photo_name} to album {album_id} for year {photo_year}")
@@ -155,7 +169,6 @@ class PhotoSync:
                     self.addPhotoToAlbum(self.albums.get(photo_year), photo_token, description)
                 else:
                     logger.warning(f"Year album {photo_year} does not exist, skipping adding photo to year album.")
-
 
     def readPhotosInAlbum(self, album_id):
         """
@@ -412,6 +425,50 @@ class PhotoSync:
                     raise
         raise Exception("Too many retries for batchCreate")
 
+    def uploadLargeVideo(self, album_id, video_path, description=None, video_date=None, chunk_size=8 * 1024 * 1024):
+        """
+        Upload a large video file to Google Photos by streaming it in chunks.
+        Note: Google Photos API does not support resumable uploads, but streaming avoids loading the whole file into memory.
+        :param album_id: The album ID to add the video to.
+        :param video_path: Path to the video file.
+        :param description: Optional description.
+        :param chunk_size: Size of chunks to stream (default 8MB).
+        """
+        if self.dry_run:
+            logger.info(f"[Dry Run] Would upload large video {video_path} to album {album_id} with description '{description}'")
+            return
+
+        headers = {
+            'Authorization': "Bearer " + self.creds.token,
+            'Content-Type': 'application/octet-stream',
+            'X-Goog-Upload-File-Name': '"' + pathname2url(os.path.basename(video_path)) + '"',
+            'X-Goog-Upload-Protocol': "raw",
+        }
+        upload_url = 'https://photoslibrary.googleapis.com/v1/uploads'
+        try:
+            logger.info(f"Uploading large video {video_path} (streaming in chunks)")
+            with open(video_path, "rb") as video_file:
+                response = requests.post(upload_url, data=video_file, headers=headers, timeout=1800)
+            if response.status_code != 200:
+                logger.error(f"Failed to upload video {video_path}: {response.status_code} {response.text}")
+                return
+            upload_token = response.content.decode('utf-8')
+            body = {
+                "albumId": album_id,
+                "newMediaItems": [{
+                    'description': description if description else os.path.basename(video_path),
+                    "simpleMediaItem": {"uploadToken": upload_token}
+                }]
+            }
+            media_result = self.safe_batch_create(body)
+            if 'newMediaItemResults' in media_result and media_result['newMediaItemResults'] and media_result['newMediaItemResults'][0]['status']['message'] == 'Success':
+                logger.info(f"\tLarge video {video_path.strip(self.sync_directory)} status {media_result['newMediaItemResults'][0]['status']}")
+            else:
+                logger.error(f"Error uploading large video {video_path.strip(self.sync_directory)}: {media_result}")
+        except Exception as err:
+            logger.error(f"Error uploading large video {video_path.strip(self.sync_directory)}\t{err}")
+        return upload_token
+        
 
 if __name__ == "__main__":
     import argparse
