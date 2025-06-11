@@ -32,7 +32,11 @@ def get_exif_creation_date(path):
     except UnidentifiedImageError:
         logger.error(f"Error: Unable to open image {path}. It may not be a valid image file.")
         return None
-    exif_data = image._getexif()
+    try
+        exif_data = image._getexif()
+    except:
+        return None
+    
     if not exif_data:
         return None
 
@@ -278,6 +282,8 @@ class PhotoSync:
             sync_pool.join()
         if photo_task and not self.dry_run:
             photos_pool.starmap(self.uploadPhotoToAlbum, photo_task)
+            photos_pool.close()
+            photos_pool.join()
 
     def listAlbums(self):
         # Call the Photo v1 API
