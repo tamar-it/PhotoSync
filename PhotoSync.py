@@ -32,7 +32,7 @@ def get_exif_creation_date(path):
     except UnidentifiedImageError:
         logger.error(f"Error: Unable to open image {path}. It may not be a valid image file.")
         return None
-    try
+    try:
         exif_data = image._getexif()
     except:
         return None
@@ -303,7 +303,8 @@ class PhotoSync:
 
     def createAlbum(self,album_name):
         """ thread safe create album """
-        mutex = threading.Lock()
+        # Use a mutex to ensure thread safety when creating albums
+        mutex = multiprocessing.Lock()
         with mutex:
             if album_name in self.albums:
                 logger.info(f"Album {album_name} already exists with ID {self.albums[album_name]}")
@@ -319,7 +320,6 @@ class PhotoSync:
             if results and 'id' in results:
                 self.albums[album_name] = results["id"]
             return results["id"]
-        mutex.release()
 
     def uploadPhoto(self,album_id,photo_name,description=None):
         #batch = BatchHttpRequest()
