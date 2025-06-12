@@ -287,19 +287,25 @@ class PhotoSync:
 
     def listAlbums(self):
         # Call the Photo v1 API
-        results = self.service.albums().list(pageSize=50, fields="nextPageToken,albums(id,title)").execute()
+        results = self.service.albums().list(pageSize=50, fields="nextPageToken,albums(id,title,mediaItemsCount)").execute()
         items = results.get('albums', [])
         page_token = results.get('nextPageToken')
         while page_token is not None:
-            results = self.service.albums().list(pageSize=50, fields="nextPageToken,albums(id,title)", pageToken=page_token).execute()
+            results = self.service.albums().list(pageSize=50, fields="nextPageToken,albums(id,title,mediaItemsCount)", pageToken=page_token).execute()
             items += results.get('albums', [])
             page_token = results.get('nextPageToken')
-
-        results = self.service.albums().list(fields="nextPageToken,albums(id,title)").execute()
+        
+        #results = self.service.albums().list(fields="nextPageToken,albums(id,title)").execute()
         albums = {}
         for album in items:
-            albums[album.get("title")] = album.get("id")
-        return albums
+            if albums.get(album.get("title")) is not None:
+                if albums[album.get("title")].get("mediaItemsCount", 0) < album.get("mediaItemsCount", 0):
+                    logger.info(f"Album {album.get('title')} has more media items, updating ID from {albums[album.get('title')]} to {album.get('id')}")
+                    albums[album.get("title")] = album
+            else:
+                logger.info(f"Adding album {album.get('title')} with ID {album.get('id')}")
+                albums[album.get("title")] = album
+        return {albums[title].get("title"): albums[title].get("id") for title in albums if albums[title].get("id") is not None}
 
     def createAlbum(self,album_name):
         """ thread safe create album """
